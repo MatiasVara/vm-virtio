@@ -522,6 +522,29 @@ mod verification {
             // So we do not care
         }
     }
+
+    #[kani::proof]
+    #[kani::unwind(0)]
+    fn verify_add_used() {
+        let ProofContext(mut queue, mem) = kani::any();
+        let used_idx = queue.next_used;
+
+        let used_desc_table_index = kani::any();
+        if queue.add_used(&mem, used_desc_table_index, kani::any()).is_ok() {
+            assert_eq!(queue.next_used, used_idx + Wrapping(1));
+        } else {
+            assert_eq!(queue.next_used, used_idx);
+
+            // Ideally, here we would want to actually read the relevant values from memory and
+            // assert they are unchanged. However, kani will run out of memory if we try to do so,
+            // so we instead verify the following "proxy property": If an error happened, then
+            // it happened at the very beginning of add_used, meaning no memory accesses were
+            // done. This is relying on implementation details of add_used, namely that
+            // the check for out-of-bounds descriptor index happens at the very beginning of the
+            // function.
+            assert!(used_desc_table_index >= queue.size());
+        }
+    }
 }
 
 impl<'a> QueueGuard<'a> for Queue {
